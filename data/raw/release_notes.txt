@@ -1,0 +1,14 @@
+SentinelRAG Research Platform — Release Notes
+
+Version 0.1.0 (Phase 1):
+- Foundation architecture established with local-first Docker Compose (PostgreSQL 16, Qdrant).
+- FastAPI backend implemented with /health and /ready readiness probes.
+- Streamlit interactive diagnostics interface created.
+- Centralized structured logging with request ID tracing and sensitive secret redaction.
+
+Version 0.2.0 (Phase 2):
+- Document Ingestion Service supporting PDF, Markdown, Plain Text, and DOCX files.
+- Structure-aware chunking preserving section headings and page numbers.
+- SHA-256 content hashing and automatic duplicate detection.
+- FastEmbed local embedding provider integration using BAAI/bge-small-en-v1.5.
+- Document and chunk management REST APIs.
