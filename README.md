@@ -60,18 +60,17 @@ Final Verified Answer
 
 ## 🚦 Current Phase & Status
 
-- **Current Phase:** `Phase 2: Document Ingestion, Chunking, Embeddings, PostgreSQL & Qdrant`
+- **Current Phase:** `Phase 3: Conventional RAG Baseline (Retrieval, Context, Generation & Query API)`
 - **Status:** **Completed & Operational ✅**
 - **Highlights:**
+  - Full RAG query engine with dense retrieval, deduplicating Context Builder, and LLM provider abstraction.
+  - LLM client abstraction supporting OpenAI-compatible REST endpoints (via raw `httpx`, zero extra library dependencies) and fallback mocks.
   - Complete ingestion pipeline supporting PDF, Markdown, Plain Text, and Word DOCX.
   - Structure-aware chunking preserving section headings, outline trails, and page numbers.
-  - Deterministic SHA-256 content deduplication preventing redundant storage and vector compute.
-  - Local ONNX embedding provider (`FastEmbed` with `BAAI/bge-small-en-v1.5`, 384 dims, zero API keys required).
-  - PostgreSQL relational models (`DocumentRecord` + `DocumentChunkRecord`).
-  - Qdrant vector database collection management and chunk indexing.
-  - FastAPI document CRUD API (`POST`, `GET`, `DELETE` on `/api/v1/documents`).
-  - Streamlit UI with live document uploader, corpus browser, and diagnostics.
-  - 43 automated unit and integration tests passing with 100% success rate.
+  - Local ONNX embedding provider (`FastEmbed` with `BAAI/bge-small-en-v1.5`, 384 dims).
+  - PostgreSQL relational database metadata persistence and Qdrant vector database collection indexing.
+  - Streamlit UI with live ingestion, document browsing, system metrics, and RAG Query Playground.
+  - 61 automated unit, integration, and E2E tests passing with 100% success rate.
 
 ---
 
@@ -185,6 +184,43 @@ curl -X GET http://localhost:8000/api/v1/documents/<DOCUMENT_UUID>
 ### Delete Document & Vectors
 ```bash
 curl -X DELETE http://localhost:8000/api/v1/documents/<DOCUMENT_UUID>
+```
+
+---
+
+## 💬 RAG Query API Examples
+
+### Execute Cited Query
+```bash
+curl -X POST http://localhost:8000/api/v1/query \
+     -H "Content-Type: application/json" \
+     -d '{"question": "What is retrieval augmented generation?", "top_k": 3, "score_threshold": 0.25}'
+```
+
+#### Example Output:
+```json
+{
+  "answer": "Retrieval Augmented Generation (RAG) is a technique that combines retrieval models with generative LLMs [Evidence 1].",
+  "sources": [
+    {
+      "document_title": "SentinelRAG Spec",
+      "filename": "sys_spec.md",
+      "page_number": 1,
+      "section_heading": "Introduction",
+      "chunk_index": 0,
+      "score": 0.8654,
+      "document_id": "8a8342db-4fdc-4a37-97eb-30fbe8f1a141"
+    }
+  ],
+  "retrieval_latency_ms": 25.4,
+  "generation_latency_ms": 845.2,
+  "total_latency_ms": 870.6,
+  "model_used": "gpt-4o",
+  "chunks_retrieved": 1,
+  "context_chars": 234,
+  "request_id": "ea3bc12",
+  "grounded": true
+}
 ```
 
 ---

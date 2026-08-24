@@ -1,1 +1,1 @@
-"""Package initialization."""
+"""LLM provider abstraction package for SentinelRAG."""

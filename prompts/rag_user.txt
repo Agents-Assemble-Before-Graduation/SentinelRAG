@@ -1,0 +1,9 @@
+Answer the following question using ONLY the evidence passages below.
+
+<evidence>
+{evidence_blocks}
+</evidence>
+
+Question: {question}
+
+Answer (cite evidence passages inline using [Evidence N]):

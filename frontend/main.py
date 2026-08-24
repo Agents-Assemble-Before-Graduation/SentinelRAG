@@ -96,7 +96,7 @@ def fetch_documents(base_url: str) -> list[dict[str, Any]]:
 # Sidebar
 with st.sidebar:
     st.markdown("### 🛡️ SentinelRAG")
-    st.markdown("<span class='badge-pill'>PHASE 2: INGESTION ACTIVE</span>", unsafe_allow_html=True)
+    st.markdown("<span class='badge-pill'>PHASE 3: BASELINE ACTIVE</span>", unsafe_allow_html=True)
     st.markdown("---")
 
     backend_url = st.text_input("Backend API Endpoint", value=get_backend_url())
@@ -242,38 +242,79 @@ with tab_documents:
             st.info("No documents currently indexed. Ingest a document or run `python scripts/ingest_demo_data.py`.")
 
 
-# TAB 3: Query Playground (Preview)
+# TAB 3: Query Playground
 with tab_query_preview:
-    st.markdown("### 💬 Sentinel Query Playground")
+    st.markdown("### 💬 Sentinel Query Playground (Baseline RAG)")
 
     st.info(
-        "ℹ️ **Phase 2 Complete:** Document ingestion, chunking, deduplication, and embeddings are active. "
-        "Multi-agent reasoning loops (Planner, Critic, Claim Verification, Repair) will be integrated in Phase 3 & 4."
+        "ℹ️ **Phase 3: Conventional RAG Baseline Active.** "
+        "Direct retrieval, context construction, and LLM grounded generation are operational."
     )
 
     query_text = st.text_area(
-        "Enter test research query:",
+        "Enter research query:",
         placeholder="e.g., What are the performance trade-offs of speculative decoding in MoE models?",
         height=100,
     )
 
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
-        mode = st.selectbox(
-            "Execution Pipeline Mode:",
-            [
-                "Full Sentinel Multi-Agent Pipeline (Phase 3+)",
-                "Direct Hybrid Retrieval (Phase 3+)",
-                "Direct LLM Baseline",
-            ],
-            index=0,
-        )
+        top_k = st.slider("Top K Retrieved Chunks:", min_value=1, max_value=20, value=5)
     with col_opt2:
-        confidence_threshold = st.slider("Verification Confidence Threshold:", 0.0, 1.0, 0.85, 0.05)
+        score_threshold = st.slider("Similarity Score Threshold:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
 
-    execute_btn = st.button("🚀 Run Pipeline", type="primary", disabled=True)
+    execute_btn = st.button("🚀 Run Query", type="primary")
 
-    st.caption("🔒 Execution disabled during Phase 2 Ingestion mode.")
+    if execute_btn:
+        if not query_text.strip():
+            st.warning("Please enter a valid query.")
+        else:
+            with st.spinner("Executing RAG Pipeline..."):
+                try:
+                    payload = {
+                        "question": query_text.strip(),
+                        "top_k": top_k,
+                        "score_threshold": score_threshold,
+                    }
+                    with httpx.Client(timeout=60.0) as client:
+                        resp = client.post(f"{backend_url}/api/v1/query", json=payload)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.markdown("#### 📝 Answer")
+                            st.write(data.get("answer"))
+
+                            # Latency breakdown
+                            st.markdown("---")
+                            st.markdown("#### ⚡ Telemetry")
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Retrieval Latency", f"{data.get('retrieval_latency_ms')} ms")
+                            col2.metric("Generation Latency", f"{data.get('generation_latency_ms')} ms")
+                            col3.metric("Total Latency", f"{data.get('total_latency_ms')} ms")
+                            
+                            st.caption(f"Model used: `{data.get('model_used')}` | Chunks retrieved: `{data.get('chunks_retrieved')}` | Context size: `{data.get('context_chars')} chars` | Request ID: `{data.get('request_id')}`")
+
+                            # Sources and page numbers
+                            st.markdown("---")
+                            st.markdown("#### 📚 Sources")
+                            sources = data.get("sources", [])
+                            if sources:
+                                for idx, src in enumerate(sources, start=1):
+                                    page_info = f"Page {src.get('page_number')}" if src.get('page_number') is not None else "N/A"
+                                    sec_info = src.get('section_heading') or "N/A"
+                                    st.markdown(
+                                        f"**{idx}. {src.get('document_title')}** "
+                                        f"(File: `{src.get('filename')}`, {page_info}, Section: *{sec_info}*, Score: `{src.get('score')}`)"
+                                    )
+                            else:
+                                st.info("No sources cited (possibly insufficient evidence).")
+                        elif resp.status_code == 503:
+                            detail = resp.json().get("detail", {})
+                            st.error(f"LLM Provider Error: {detail.get('message')}")
+                            st.info(detail.get("hint"))
+                        else:
+                            st.error(f"Query failed ({resp.status_code}): {resp.text}")
+                except Exception as e:
+                    st.error(f"Error connecting to backend: {str(e)}")
 
 
 # TAB 4: Architecture & Roadmap

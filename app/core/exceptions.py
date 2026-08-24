@@ -35,3 +35,8 @@ class ResourceNotFoundError(SentinelRAGException):
 class ValidationError(SentinelRAGException):
     """Raised when validation fails on business logic or data payload."""
     pass
+
+
+class LLMProviderError(SentinelRAGException):
+    """Raised when an LLM provider fails, is misconfigured, or is unavailable."""
+    pass

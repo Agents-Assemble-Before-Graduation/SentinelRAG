@@ -76,6 +76,19 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = Field(default="openai", description="Default LLM provider")
     LLM_MODEL: str = Field(default="gpt-4o", description="Default LLM model name")
     LLM_API_KEY: str | None = Field(default=None, description="LLM provider API key")
+    LLM_BASE_URL: str = Field(
+        default="https://api.openai.com/v1",
+        description="Base URL for OpenAI-compatible LLM API endpoint",
+    )
+
+    # RAG Query Configuration
+    RAG_TOP_K: int = Field(default=5, description="Number of chunks to retrieve per query")
+    RAG_SCORE_THRESHOLD: float = Field(
+        default=0.3, description="Minimum similarity score for retrieved chunks"
+    )
+    RAG_MAX_CONTEXT_CHARS: int = Field(
+        default=12000, description="Maximum characters in assembled RAG context"
+    )
 
     @field_validator("LOG_LEVEL")
     @classmethod
