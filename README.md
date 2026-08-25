@@ -60,15 +60,15 @@ Final Verified Answer
 
 ## 🚦 Current Phase & Status
 
-- **Current Phase:** `Phase 4: Hybrid Retrieval, Reranking & Research Evaluation Baseline`
+- **Current Phase:** `Phase 5: LangGraph Multi-Agent RAG`
 - **Status:** **Completed & Operational ✅**
 - **Highlights:**
-  - Lexical keyword search (`BM25Retriever`) combined with semantic vector search (`DenseRetriever`) in unified `HybridRetriever`.
-  - Configurable weighted linear fusion using Min-Max score normalization.
-  - Cross-Encoder reranking (`FastEmbedReranker` running local ONNX models) with sandbox-safe `MockReranker` fallbacks.
-  - Evaluation seed dataset and runner script (`scripts/evaluate_rag.py`) calculating Recall@K, Precision@K, MRR, NDCG@K, faithfulness, relevance, and citation completeness.
-  - Streamlit playground UI updated with hybrid retrieval selections, reranker toggles, and metadata telemetry.
-  - 71 automated unit, integration, and E2E tests passing with 100% success rate.
+  - Dynamic query classification (into factual, definition, comparison, multi-hop, summarization, numerical, ambiguous) and retrieval strategy planning using `PlannerAgent`.
+  - Sequential agent state graph orchestration using LangGraph: `START -> Planner -> Retrieval -> Reranking -> Context Builder -> Generator -> END`.
+  - Grounded answer generation utilizing the existing `RAGGenerator` without query logic duplication.
+  - Interactive multi-agent pipeline execution timeline rendered directly in the Streamlit diagnostics interface.
+  - Fully sandboxed testing setup with lazy-initialized retrieval singletons and configuration dependency injection.
+  - 76 automated unit, integration, and E2E tests passing with 100% success rate.
 
 ---
 

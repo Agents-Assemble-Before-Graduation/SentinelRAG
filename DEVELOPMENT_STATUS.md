@@ -1,6 +1,6 @@
 # SentinelRAG — Development Status
 
-## Current Status: Phase 4 (Complete)
+## Current Status: Phase 5 (Complete)
 
 **Last Updated:** August 2026
 **Target Architecture:** Local-First Self-Improving Multi-Agent RAG
@@ -15,8 +15,32 @@
 | **Phase 2** | Document Ingestion, Chunking, Embeddings, PostgreSQL & Qdrant | **Completed ✅** |
 | **Phase 3** | Conventional RAG Baseline (Retrieval, Context, Generation & Query API) | **Completed ✅** |
 | **Phase 4** | Hybrid Retrieval, Reranking & Research Evaluation Baseline | **Completed ✅** |
-| **Phase 5** | Multi-Agent Reasoning Loops (Planner, Critic, Claim Extractor, Verifier, Repair) | **Next Up ⏳** |
-| **Phase 6** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | Planned ⏳ |
+| **Phase 5** | Multi-Agent Reasoning Loops (Planner & Generator orchestration via LangGraph) | **Completed ✅** |
+| **Phase 6** | Multi-Agent Refinement (Critic, Claim Extractor, Evidence Verifier, Repair) | **Next Up ⏳** |
+| **Phase 7** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | Planned ⏳ |
+
+---
+
+## ✅ Completed in Phase 5
+
+1. **Typed Agent State Graph (`app/agents/state.py`):**
+   - Created `AgentState` TypedDict to capture data across all pipeline steps: question, classification, plan, subquestions, candidate document pools, context text, generation, and telemetry.
+
+2. **Planner Agent (`app/agents/planner.py`):**
+   - Implemented `PlannerAgent` performing query classification (factual, definition, comparison, etc.) and selecting optimal retrieval strategies (dense, BM25, hybrid) via structured JSON prompting or local rule-based heuristics fallback.
+
+3. **Generator Agent (`app/agents/generator.py`):**
+   - Implemented `GeneratorAgent` wrapping the existing grounded `RAGGenerator` engine without duplicating retrieval or prompt logic.
+
+4. **LangGraph Orchestrator Workflow (`app/agents/graph.py`):**
+   - Constructed the sequential state graph: `START -> Planner -> Retrieval -> Reranking -> Context Builder -> Generator -> END`.
+   - Enabled flexible dependency injection via `RunnableConfig` for test isolation and runtime configuration overrides.
+
+5. **Playground UI Timeline (`frontend/main.py`):**
+   - Rendered a horizontal Flexbox pipeline execution timeline showing Planning, Retrieval, Reranking, and Generation stages along with their exact latencies.
+
+6. **Agent Unit Test Suite (`tests/unit/test_agents.py`):**
+   - Added tests covering planner rule heuristics, LLM JSON parsing, generator mappings, node transitions, and full graph execution pipelines (76 tests passing).
 
 ---
 

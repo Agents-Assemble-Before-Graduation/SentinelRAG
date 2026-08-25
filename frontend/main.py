@@ -96,7 +96,7 @@ def fetch_documents(base_url: str) -> list[dict[str, Any]]:
 # Sidebar
 with st.sidebar:
     st.markdown("### 🛡️ SentinelRAG")
-    st.markdown("<span class='badge-pill'>PHASE 4: HYBRID ACTIVE</span>", unsafe_allow_html=True)
+    st.markdown("<span class='badge-pill'>PHASE 5: LANGGRAPH AGENT ACTIVE</span>", unsafe_allow_html=True)
     st.markdown("---")
 
     backend_url = st.text_input("Backend API Endpoint", value=get_backend_url())
@@ -304,6 +304,22 @@ with tab_query_preview:
                             col5.metric("Reranking", rerank_status)
                             
                             st.caption(f"Model used: `{data.get('model_used')}` | Chunks retrieved: `{data.get('chunks_retrieved')}` | Context size: `{data.get('context_chars')} chars` | Request ID: `{data.get('request_id')}`")
+
+                            # Execution timeline
+                            latencies = meta.get("latency_breakdown", {})
+                            st.markdown("##### 🤖 Multi-Agent Execution Timeline")
+                            stages_html = f"""
+                            <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f0f2f6; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                                <div style="text-align: center; flex: 1;"><strong>🧠 Planning</strong><br><span style="color: #666; font-size: 11px;">{latencies.get('planning', 0.0)} ms</span></div>
+                                <div style="color: #999;">➡️</div>
+                                <div style="text-align: center; flex: 1;"><strong>🔍 Retrieval</strong><br><span style="color: #666; font-size: 11px;">{latencies.get('retrieval', 0.0)} ms</span></div>
+                                <div style="color: #999;">➡️</div>
+                                <div style="text-align: center; flex: 1;"><strong>⚡ Reranking</strong><br><span style="color: #666; font-size: 11px;">{latencies.get('reranking', 0.0)} ms</span></div>
+                                <div style="color: #999;">➡️</div>
+                                <div style="text-align: center; flex: 1;"><strong>✍️ Generation</strong><br><span style="color: #666; font-size: 11px;">{latencies.get('generation', 0.0)} ms</span></div>
+                            </div>
+                            """
+                            st.markdown(stages_html, unsafe_allow_html=True)
 
                             # Sources and page numbers
                             st.markdown("---")

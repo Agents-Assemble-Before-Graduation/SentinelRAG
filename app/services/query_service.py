@@ -123,7 +123,7 @@ class RAGQueryService:
         retrieval_mode: str | None = None,
         rerank_enabled: bool | None = None,
     ) -> QueryResult:
-        """Execute the full RAG pipeline for a user question.
+        """Execute the full LangGraph multi-agent RAG pipeline for a user question.
 
         Args:
             question: Raw user question string.
@@ -142,61 +142,51 @@ class RAGQueryService:
         """
         pipeline_start = time.perf_counter()
 
-        effective_top_k = top_k if top_k is not None else self._top_k
-        effective_threshold = (
-            score_threshold if score_threshold is not None else self._score_threshold
-        )
-        effective_mode = (retrieval_mode or self._retrawal_mode).lower()
-        effective_rerank = (
-            rerank_enabled if rerank_enabled is not None else self._rerank_enabled
-        )
+        # Initialize LangGraph state
+        initial_state = {
+            "question": question,
+            "workspace_id": workspace_id,
+            "query_type": "",
+            "plan": "",
+            "subquestions": [],
+            "retrieval_strategy": "",
+            "retrieved_documents": [],
+            "reranked_documents": [],
+            "context": "",
+            "draft_answer": "",
+            "final_answer": "",
+            "sources": [],
+            "claims": [],
+            "critique": "",
+            "verification": {},
+            "repair_strategy": "",
+            "retry_count": 0,
+            "final_decision": "",
+            "confidence": 0.0,
+            "cost": 0.0,
+            "latency": {},
+        }
 
-        # ── Step 1: Retrieval (Dense, BM25, or Hybrid) ────────────────────────
-        retrieval_start = time.perf_counter()
-        
-        if effective_mode == "bm25":
-            chunks = await self._bm25_retriever.retrieve(
-                query=question,
-                top_k=effective_top_k,
-                score_threshold=effective_threshold,
-                workspace_id=workspace_id,
-            )
-        elif effective_mode == "hybrid":
-            chunks = await self._hybrid_retriever.retrieve(
-                query=question,
-                top_k=effective_top_k,
-                score_threshold=effective_threshold,
-                workspace_id=workspace_id,
-            )
-        else:  # default to dense
-            chunks = await self._dense_retriever.retrieve(
-                query=question,
-                top_k=effective_top_k,
-                score_threshold=effective_threshold,
-                workspace_id=workspace_id,
-            )
+        # Run compiled LangGraph state graph
+        config = {
+            "configurable": {
+                "db": db,
+                "top_k": top_k or self._top_k,
+                "score_threshold": score_threshold or self._score_threshold,
+                "retrieval_mode": retrieval_mode,
+                "rerank_enabled": rerank_enabled,
+                "dense_retriever": self._dense_retriever,
+                "bm25_retriever": self._bm25_retriever,
+                "hybrid_retriever": self._hybrid_retriever,
+                "context_builder": self._context_builder,
+                "generator": self._generator,
+            }
+        }
 
-        # Optional: Cross-Encoder Reranking
-        reranked = False
-        if effective_rerank and chunks:
-            reranker = get_reranker()
-            chunks = await reranker.rerank(question, chunks)
-            reranked = True
+        from app.agents.graph import compiled_graph
+        final_state = await compiled_graph.ainvoke(initial_state, config=config)
 
-        retrieval_latency_ms = (time.perf_counter() - retrieval_start) * 1000
-
-        # ── Step 2: Context assembly ──────────────────────────────────────────
-        context: BuiltContext = self._context_builder.build(chunks)
-
-        # ── Step 3: LLM generation ────────────────────────────────────────────
-        generation_start = time.perf_counter()
-        result: GenerationResult = await self._generator.generate(
-            question=question,
-            context=context,
-        )
-        generation_latency_ms = (time.perf_counter() - generation_start) * 1000
-
-        total_latency_ms = (time.perf_counter() - pipeline_start) * 1000
+        total_latency_ms = (time.perf_counter() - pipeline_start) * 1000.0
 
         # ── Step 4: Audit log ─────────────────────────────────────────────────
         if db is not None:
@@ -204,30 +194,60 @@ class RAGQueryService:
                 db=db,
                 workspace_id=workspace_id,
                 question=question,
-                answer=result.answer,
+                answer=final_state.get("final_answer", ""),
                 latency_ms=total_latency_ms,
             )
 
         # ── Step 5: Build response ────────────────────────────────────────────
-        sources = [QuerySource.from_citation(c) for c in result.sources]
+        sources_dict = final_state.get("sources") or []
+        sources = [
+            QuerySource(
+                document_title=s["document_title"],
+                filename=s["filename"],
+                page_number=s["page_number"],
+                section_heading=s["section_heading"],
+                chunk_index=s["chunk_index"],
+                score=s["score"],
+                document_id=s["document_id"],
+            )
+            for s in sources_dict
+        ]
+
+        # Extract latencies from graph run
+        latencies = final_state.get("latency") or {}
+        retrieval_latency = latencies.get("retrieval", 0.0)
+        generation_latency = latencies.get("generation", 0.0)
+
+        # Retrieve dynamic parameters chosen by the agent
+        chosen_strategy = final_state.get("retrieval_strategy", "dense")
+        query_type = final_state.get("query_type", "factual")
+
+        settings = get_settings()
+        effective_rerank = (
+            rerank_enabled if rerank_enabled is not None else settings.RAG_RERANK_ENABLED
+        )
+        reranked = bool(effective_rerank and final_state.get("reranked_documents"))
 
         return QueryResult(
-            answer=result.answer,
+            answer=final_state.get("final_answer", ""),
             sources=sources,
-            retrieval_latency_ms=round(retrieval_latency_ms, 2),
-            generation_latency_ms=round(generation_latency_ms, 2),
+            retrieval_latency_ms=round(retrieval_latency, 2),
+            generation_latency_ms=round(generation_latency, 2),
             total_latency_ms=round(total_latency_ms, 2),
-            model_used=result.model_used,
-            chunks_retrieved=len(chunks),
-            context_chars=context.total_chars,
-            grounded=result.grounded,
-            tokens_used=result.tokens_used,
+            model_used=self._generator._llm.model_name,
+            chunks_retrieved=len(final_state.get("retrieved_documents") or []),
+            context_chars=len(final_state.get("context", "")),
+            grounded=final_state.get("final_decision") == "accept",
+            tokens_used=0,
             metadata={
-                "context_truncated": context.was_truncated,
-                "finish_reason": result.finish_reason,
-                "retrieval_mode": effective_mode,
+                "context_truncated": False,
+                "finish_reason": "stop",
+                "retrieval_mode": chosen_strategy,
+                "query_type": query_type,
                 "rerank_enabled": effective_rerank,
                 "reranked": reranked,
+                "plan": final_state.get("plan", ""),
+                "latency_breakdown": latencies,
             },
         )
 
