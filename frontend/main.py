@@ -96,7 +96,7 @@ def fetch_documents(base_url: str) -> list[dict[str, Any]]:
 # Sidebar
 with st.sidebar:
     st.markdown("### 🛡️ SentinelRAG")
-    st.markdown("<span class='badge-pill'>PHASE 3: BASELINE ACTIVE</span>", unsafe_allow_html=True)
+    st.markdown("<span class='badge-pill'>PHASE 4: HYBRID ACTIVE</span>", unsafe_allow_html=True)
     st.markdown("---")
 
     backend_url = st.text_input("Backend API Endpoint", value=get_backend_url())
@@ -257,11 +257,15 @@ with tab_query_preview:
         height=100,
     )
 
-    col_opt1, col_opt2 = st.columns(2)
+    col_opt1, col_opt2, col_opt3, col_opt4 = st.columns(4)
     with col_opt1:
-        top_k = st.slider("Top K Retrieved Chunks:", min_value=1, max_value=20, value=5)
+        top_k = st.slider("Top K Chunks:", min_value=1, max_value=20, value=5)
     with col_opt2:
-        score_threshold = st.slider("Similarity Score Threshold:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
+        score_threshold = st.slider("Threshold:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
+    with col_opt3:
+        retrieval_mode = st.selectbox("Retrieval Mode:", ["dense", "bm25", "hybrid"], index=0)
+    with col_opt4:
+        rerank_enabled = st.checkbox("Cross-Encoder Reranking", value=False)
 
     execute_btn = st.button("🚀 Run Query", type="primary")
 
@@ -275,6 +279,8 @@ with tab_query_preview:
                         "question": query_text.strip(),
                         "top_k": top_k,
                         "score_threshold": score_threshold,
+                        "retrieval_mode": retrieval_mode,
+                        "rerank_enabled": rerank_enabled,
                     }
                     with httpx.Client(timeout=60.0) as client:
                         resp = client.post(f"{backend_url}/api/v1/query", json=payload)
@@ -286,10 +292,16 @@ with tab_query_preview:
                             # Latency breakdown
                             st.markdown("---")
                             st.markdown("#### ⚡ Telemetry")
-                            col1, col2, col3 = st.columns(3)
+                            col1, col2, col3, col4, col5 = st.columns(5)
                             col1.metric("Retrieval Latency", f"{data.get('retrieval_latency_ms')} ms")
                             col2.metric("Generation Latency", f"{data.get('generation_latency_ms')} ms")
                             col3.metric("Total Latency", f"{data.get('total_latency_ms')} ms")
+                            
+                            meta = data.get("metadata", {})
+                            col4.metric("Retrieval Mode", meta.get("retrieval_mode", retrieval_mode).upper())
+                            
+                            rerank_status = "ACTIVE" if meta.get("reranked", rerank_enabled) else "DISABLED"
+                            col5.metric("Reranking", rerank_status)
                             
                             st.caption(f"Model used: `{data.get('model_used')}` | Chunks retrieved: `{data.get('chunks_retrieved')}` | Context size: `{data.get('context_chars')} chars` | Request ID: `{data.get('request_id')}`")
 

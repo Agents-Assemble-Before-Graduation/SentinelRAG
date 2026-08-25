@@ -1,6 +1,6 @@
 # SentinelRAG — Development Status
 
-## Current Status: Phase 3 (Complete)
+## Current Status: Phase 4 (Complete)
 
 **Last Updated:** August 2026
 **Target Architecture:** Local-First Self-Improving Multi-Agent RAG
@@ -14,8 +14,44 @@
 | **Phase 1** | Foundation, Architecture & Local Development Environment | **Completed ✅** |
 | **Phase 2** | Document Ingestion, Chunking, Embeddings, PostgreSQL & Qdrant | **Completed ✅** |
 | **Phase 3** | Conventional RAG Baseline (Retrieval, Context, Generation & Query API) | **Completed ✅** |
-| **Phase 4** | Multi-Agent Reasoning Loops (Planner, Critic, Claim Extractor, Evidence Verifier, Repair) | **Next Up ⏳** |
-| **Phase 5** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | Planned ⏳ |
+| **Phase 4** | Hybrid Retrieval, Reranking & Research Evaluation Baseline | **Completed ✅** |
+| **Phase 5** | Multi-Agent Reasoning Loops (Planner, Critic, Claim Extractor, Verifier, Repair) | **Next Up ⏳** |
+| **Phase 6** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | Planned ⏳ |
+
+---
+
+## ✅ Completed in Phase 4
+
+1. **BM25 Keyword Retrieval (`app/rag/retrieval/bm25.py`):**
+   - Implemented `BM25Retriever` executing exact keyword search using in-memory BM25 engines over document chunks.
+   - Built automatic database chunk caching keyed by `(workspace_id, db_chunk_count)` for zero-compute query reuse.
+
+2. **Weighted Score Fusion (`app/rag/retrieval/hybrid.py`):**
+   - Implemented `HybridRetriever` combining dense and BM25 result pools.
+   - Built a Min-Max score normalizer to translate different search score scales before weighted linear combination.
+
+3. **Cross-Encoder Reranking (`app/rag/retrieval/reranker.py`):**
+   - Integrated `FastEmbedReranker` running local ONNX cross-encoders (`Xenova/ms-marco-MiniLM-L-6-v2`) for re-scoring candidates.
+   - Created offline-safe `MockReranker` using term-overlaps, avoiding network calls during tests.
+
+4. **Retriever Interfaces & Ablation Support:**
+   - Established unified `BaseRetriever` ABC and `BaseReranker` ABC interfaces to support clean modular swapping for research ablation experiments.
+
+5. **Benchmark Evaluation Dataset (`data/evaluation/benchmark.json`):**
+   - Created a seed dataset with 8 questions covering: factual, definition, comparison, multi-hop, summarization, numerical, ambiguous, and insufficient evidence categories.
+
+6. **Retrieval Metrics Suite (`app/evaluation/metrics.py`):**
+   - Built calculators for standard search quality metrics: Recall@K, Precision@K, MRR, and NDCG@K.
+
+7. **Generation Metrics & Citations (`app/evaluation/generation_metrics.py`):**
+   - Implemented LLM-as-judge prompts for faithfulness and relevance metrics (clearly documenting judge limitations).
+   - Built heuristic verifiers for sentence-level citation correctness and citation completeness.
+
+8. **Automated Experiment Runner (`scripts/evaluate_rag.py`):**
+   - Created an automated evaluation script that compares RAG modes on the benchmark and saves detailed CSV results to `evaluation_results/`.
+
+9. **Playground UI Controls:**
+   - Added selectboxes for dense/BM25/hybrid modes, checkboxes for Cross-Encoder Reranking, and detailed score telemetry cards to Streamlit.
 
 ---
 

@@ -16,7 +16,7 @@ from app.rag.context.builder import BuiltContext, ContextBuilder, SourceCitation
 from app.rag.embeddings.base import BaseEmbeddingProvider
 from app.rag.embeddings.factory import get_embedding_provider
 from app.rag.generation.generator import GenerationResult, RAGGenerator
-from app.rag.retrieval.retriever import DenseRetriever, RetrievedChunk
+from app.rag.retrieval import DenseRetriever, BM25Retriever, HybridRetriever, RetrievedChunk, get_reranker
 from app.services.vector_store import QdrantVectorStore, get_vector_store
 
 logger = get_logger(__name__)
@@ -95,12 +95,21 @@ class RAGQueryService:
             score_threshold if score_threshold is not None else settings.RAG_SCORE_THRESHOLD
         )
         self._max_context_chars = max_context_chars or settings.RAG_MAX_CONTEXT_CHARS
+        self._retrawal_mode = settings.RAG_RETRIEVAL_MODE
+        self._rerank_enabled = settings.RAG_RERANK_ENABLED
 
-        self._retriever = DenseRetriever(
+        # Instantiate all retrievers for runtime flexibility
+        self._dense_retriever = DenseRetriever(
             embedding_provider=_embedding,
             vector_store=_vector_store,
             collection_name=_collection,
         )
+        self._bm25_retriever = BM25Retriever()
+        self._hybrid_retriever = HybridRetriever(
+            dense_retriever=self._dense_retriever,
+            bm25_retriever=self._bm25_retriever,
+        )
+
         self._context_builder = ContextBuilder(max_context_chars=self._max_context_chars)
         self._generator = RAGGenerator(llm_provider=_llm)
 
@@ -111,6 +120,8 @@ class RAGQueryService:
         workspace_id: str | None = None,
         top_k: int | None = None,
         score_threshold: float | None = None,
+        retrieval_mode: str | None = None,
+        rerank_enabled: bool | None = None,
     ) -> QueryResult:
         """Execute the full RAG pipeline for a user question.
 
@@ -120,6 +131,8 @@ class RAGQueryService:
             workspace_id: Optional workspace UUID string for scoped retrieval.
             top_k: Per-request override for number of chunks to retrieve.
             score_threshold: Per-request override for similarity threshold.
+            retrieval_mode: 'dense', 'bm25', or 'hybrid'.
+            rerank_enabled: Boolean flag to enable/disable cross-encoder reranking.
 
         Returns:
             QueryResult with answer, source citations, and latency breakdown.
@@ -133,15 +146,43 @@ class RAGQueryService:
         effective_threshold = (
             score_threshold if score_threshold is not None else self._score_threshold
         )
-
-        # ── Step 1: Dense retrieval ──────────────────────────────────────────
-        retrieval_start = time.perf_counter()
-        chunks: list[RetrievedChunk] = await self._retriever.retrieve(
-            query=question,
-            top_k=effective_top_k,
-            score_threshold=effective_threshold,
-            workspace_id=workspace_id,
+        effective_mode = (retrieval_mode or self._retrawal_mode).lower()
+        effective_rerank = (
+            rerank_enabled if rerank_enabled is not None else self._rerank_enabled
         )
+
+        # ── Step 1: Retrieval (Dense, BM25, or Hybrid) ────────────────────────
+        retrieval_start = time.perf_counter()
+        
+        if effective_mode == "bm25":
+            chunks = await self._bm25_retriever.retrieve(
+                query=question,
+                top_k=effective_top_k,
+                score_threshold=effective_threshold,
+                workspace_id=workspace_id,
+            )
+        elif effective_mode == "hybrid":
+            chunks = await self._hybrid_retriever.retrieve(
+                query=question,
+                top_k=effective_top_k,
+                score_threshold=effective_threshold,
+                workspace_id=workspace_id,
+            )
+        else:  # default to dense
+            chunks = await self._dense_retriever.retrieve(
+                query=question,
+                top_k=effective_top_k,
+                score_threshold=effective_threshold,
+                workspace_id=workspace_id,
+            )
+
+        # Optional: Cross-Encoder Reranking
+        reranked = False
+        if effective_rerank and chunks:
+            reranker = get_reranker()
+            chunks = await reranker.rerank(question, chunks)
+            reranked = True
+
         retrieval_latency_ms = (time.perf_counter() - retrieval_start) * 1000
 
         # ── Step 2: Context assembly ──────────────────────────────────────────
@@ -184,6 +225,9 @@ class RAGQueryService:
             metadata={
                 "context_truncated": context.was_truncated,
                 "finish_reason": result.finish_reason,
+                "retrieval_mode": effective_mode,
+                "rerank_enabled": effective_rerank,
+                "reranked": reranked,
             },
         )
 

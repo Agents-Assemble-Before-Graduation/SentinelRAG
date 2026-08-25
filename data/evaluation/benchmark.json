@@ -1,0 +1,66 @@
+[
+  {
+    "question": "What PostgreSQL version was established in Version 0.1.0?",
+    "expected_answer": "PostgreSQL 16 was established in Version 0.1.0.",
+    "source_document": "release_notes.txt",
+    "source_page": 1,
+    "category": "factual",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is SentinelRAG?",
+    "expected_answer": "SentinelRAG is a self-improving multi-agent retrieval-augmented generation platform.",
+    "source_document": "system_spec.md",
+    "source_page": 1,
+    "category": "definition",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How does retrieval in SentinelRAG compare to single-pass RAG pipelines?",
+    "expected_answer": "Unlike single-pass RAG pipelines, SentinelRAG decomposes user queries into multi-hop retrieval plans, critiques candidate responses, extracts atomic propositions, verifies evidence against retrieved source chunks, and triggers dynamic repair loops or safe termination when evidence is lacking.",
+    "source_document": "system_spec.md",
+    "source_page": 1,
+    "category": "comparison",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What embedding model is used in the document ingestion service introduced in Version 0.2.0?",
+    "expected_answer": "The embedding model used in the document ingestion service introduced in Version 0.2.0 is BAAI/bge-small-en-v1.5.",
+    "source_document": "release_notes.txt",
+    "source_page": 1,
+    "category": "multi-hop",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Summarize the features introduced in Version 0.1.0.",
+    "expected_answer": "Version 0.1.0 established the foundation architecture with local-first Docker Compose (PostgreSQL 16, Qdrant), a FastAPI backend with /health and /ready readiness probes, a Streamlit interactive diagnostics interface, and centralized structured logging with request ID tracing and sensitive secret redaction.",
+    "source_document": "release_notes.txt",
+    "source_page": 1,
+    "category": "summarization",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What range is the confidence score computed by the Evidence Verifier bounded by?",
+    "expected_answer": "The confidence score is between 0.0 and 1.0.",
+    "source_document": "system_spec.md",
+    "source_page": 1,
+    "category": "numerical",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which database is better for multi-agent systems?",
+    "expected_answer": "The provided text does not contain a comparison or answer to determine which database is better for multi-agent systems.",
+    "source_document": "system_spec.md",
+    "source_page": 1,
+    "category": "ambiguous",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the security threshold value for the Safe Termination Engine?",
+    "expected_answer": "The provided documents do not contain the specific safety threshold value for the Safe Termination Engine.",
+    "source_document": "system_spec.md",
+    "source_page": 1,
+    "category": "insufficient evidence",
+    "difficulty": "medium"
+  }
+]

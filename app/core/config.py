@@ -70,6 +70,9 @@ class Settings(BaseSettings):
         default="BAAI/bge-small-en-v1.5", description="Default embedding model"
     )
     EMBEDDING_DIMENSION: int = Field(default=384, description="Embedding vector dimensions")
+    RERANKER_PROVIDER: str = Field(
+        default="fastembed", description="Reranker provider ('fastembed', 'mock')"
+    )
     RERANKER_MODEL: str = Field(default="bge-reranker-large", description="Default reranker model")
 
     # LLM Provider & Model Configuration (to be configured in future phases)
@@ -82,6 +85,18 @@ class Settings(BaseSettings):
     )
 
     # RAG Query Configuration
+    RAG_RETRIEVAL_MODE: str = Field(
+        default="dense", description="Default retrieval mode ('dense', 'bm25', 'hybrid')"
+    )
+    RAG_RERANK_ENABLED: bool = Field(
+        default=False, description="Whether to enable cross-encoder reranking by default"
+    )
+    RAG_DENSE_WEIGHT: float = Field(
+        default=0.5, description="Weight of dense retrieval in hybrid scoring"
+    )
+    RAG_BM25_WEIGHT: float = Field(
+        default=0.5, description="Weight of BM25 retrieval in hybrid scoring"
+    )
     RAG_TOP_K: int = Field(default=5, description="Number of chunks to retrieve per query")
     RAG_SCORE_THRESHOLD: float = Field(
         default=0.3, description="Minimum similarity score for retrieved chunks"

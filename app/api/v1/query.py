@@ -45,6 +45,14 @@ class QueryRequest(BaseModel):
         default=None,
         description="Optional workspace UUID to scope retrieval.",
     )
+    retrieval_mode: str | None = Field(
+        default=None,
+        description="Retrieval mode to use ('dense', 'bm25', 'hybrid').",
+    )
+    rerank_enabled: bool | None = Field(
+        default=None,
+        description="Whether to enable cross-encoder reranking.",
+    )
 
 
 class QuerySourceResponse(BaseModel):
@@ -113,6 +121,8 @@ async def query_documents(
             workspace_id=workspace_id_str,
             top_k=body.top_k,
             score_threshold=body.score_threshold,
+            retrieval_mode=body.retrieval_mode,
+            rerank_enabled=body.rerank_enabled,
         )
     except LLMProviderError as exc:
         logger.error("LLM provider error during query: %s", exc.message)

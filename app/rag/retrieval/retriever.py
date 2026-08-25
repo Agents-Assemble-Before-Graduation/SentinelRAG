@@ -9,26 +9,12 @@ from app.rag.embeddings.base import BaseEmbeddingProvider
 from app.rag.embeddings.factory import get_embedding_provider
 from app.services.vector_store import QdrantVectorStore, get_vector_store
 
+from app.rag.retrieval.base import BaseRetriever, RetrievedChunk
+
 logger = get_logger(__name__)
 
 
-@dataclass
-class RetrievedChunk:
-    """A single chunk retrieved from the vector store with provenance metadata."""
-
-    chunk_id: str
-    content: str
-    score: float
-    document_id: str
-    document_title: str
-    filename: str
-    page_number: int | None = None
-    section_heading: str | None = None
-    chunk_index: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-class DenseRetriever:
+class DenseRetriever(BaseRetriever):
     """Semantic retrieval using dense vector embeddings and Qdrant ANN search.
 
     Embeds the incoming query with the configured embedding provider,

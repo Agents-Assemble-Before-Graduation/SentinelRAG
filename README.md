@@ -60,17 +60,15 @@ Final Verified Answer
 
 ## 🚦 Current Phase & Status
 
-- **Current Phase:** `Phase 3: Conventional RAG Baseline (Retrieval, Context, Generation & Query API)`
+- **Current Phase:** `Phase 4: Hybrid Retrieval, Reranking & Research Evaluation Baseline`
 - **Status:** **Completed & Operational ✅**
 - **Highlights:**
-  - Full RAG query engine with dense retrieval, deduplicating Context Builder, and LLM provider abstraction.
-  - LLM client abstraction supporting OpenAI-compatible REST endpoints (via raw `httpx`, zero extra library dependencies) and fallback mocks.
-  - Complete ingestion pipeline supporting PDF, Markdown, Plain Text, and Word DOCX.
-  - Structure-aware chunking preserving section headings, outline trails, and page numbers.
-  - Local ONNX embedding provider (`FastEmbed` with `BAAI/bge-small-en-v1.5`, 384 dims).
-  - PostgreSQL relational database metadata persistence and Qdrant vector database collection indexing.
-  - Streamlit UI with live ingestion, document browsing, system metrics, and RAG Query Playground.
-  - 61 automated unit, integration, and E2E tests passing with 100% success rate.
+  - Lexical keyword search (`BM25Retriever`) combined with semantic vector search (`DenseRetriever`) in unified `HybridRetriever`.
+  - Configurable weighted linear fusion using Min-Max score normalization.
+  - Cross-Encoder reranking (`FastEmbedReranker` running local ONNX models) with sandbox-safe `MockReranker` fallbacks.
+  - Evaluation seed dataset and runner script (`scripts/evaluate_rag.py`) calculating Recall@K, Precision@K, MRR, NDCG@K, faithfulness, relevance, and citation completeness.
+  - Streamlit playground UI updated with hybrid retrieval selections, reranker toggles, and metadata telemetry.
+  - 71 automated unit, integration, and E2E tests passing with 100% success rate.
 
 ---
 
@@ -222,6 +220,23 @@ curl -X POST http://localhost:8000/api/v1/query \
   "grounded": true
 }
 ```
+
+---
+
+## 📊 Running Evaluations
+
+The Phase 4 evaluation pipeline benchmarks RAG performance (comparing `dense` and `hybrid` modes) across 8 query categories (factual, definition, comparison, multi-hop, summarization, numerical, ambiguous, and insufficient evidence).
+
+### Run Benchmark Evaluation
+Ensure Postgres and Qdrant are running and sample documents have been ingested, then execute:
+```bash
+python scripts/evaluate_rag.py
+```
+
+Results are stored in the following files:
+- `evaluation_results/evaluation_summary.json` (contains aggregate run statistics)
+- `evaluation_results/dense_detailed_results.csv` (detailed per-query metrics for dense retrieval)
+- `evaluation_results/hybrid_detailed_results.csv` (detailed per-query metrics for hybrid retrieval)
 
 ---
 
