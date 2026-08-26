@@ -321,6 +321,28 @@ with tab_query_preview:
                             """
                             st.markdown(stages_html, unsafe_allow_html=True)
 
+                            # Multi-Agent Verification telemetry
+                            st.markdown("##### 🛡️ Multi-Agent Guardrails & Verification")
+                            
+                            critic_decision = str(meta.get("final_decision", "ACCEPT")).upper()
+                            critic_status = "🟢 PASS" if critic_decision == "ACCEPT" else "🔴 FAIL"
+                            
+                            verifications = meta.get("verification") or []
+                            total_claims = len(verifications)
+                            supported_claims = sum(1 for v in verifications if v.get("status") == "SUPPORTED")
+                            partial_claims = sum(1 for v in verifications if v.get("status") == "PARTIALLY_SUPPORTED")
+                            
+                            coverage_pct = int(((supported_claims + 0.5 * partial_claims) / total_claims) * 100) if total_claims > 0 else 100
+                            confidence_pct = int(meta.get("confidence", 1.0) * 100)
+                            attempts = meta.get("retry_count", 0)
+                            
+                            col_g1, col_g2, col_g3, col_g4, col_g5 = st.columns(5)
+                            col_g1.metric("Critic Status", critic_status)
+                            col_g2.metric("Evidence Coverage", f"{coverage_pct}%")
+                            col_g3.metric("System Confidence", f"{confidence_pct}%")
+                            col_g4.metric("Repair Attempts", f"{attempts}")
+                            col_g5.metric("Final Decision", critic_decision)
+
                             # Sources and page numbers
                             st.markdown("---")
                             st.markdown("#### 📚 Sources")

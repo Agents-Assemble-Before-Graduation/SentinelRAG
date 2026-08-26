@@ -60,15 +60,17 @@ Final Verified Answer
 
 ## 🚦 Current Phase & Status
 
-- **Current Phase:** `Phase 5: LangGraph Multi-Agent RAG`
+- **Current Phase:** `Phase 6: Critic, Claim Verification, Repair Loop & Fail-Safe Kill`
 - **Status:** **Completed & Operational ✅**
 - **Highlights:**
-  - Dynamic query classification (into factual, definition, comparison, multi-hop, summarization, numerical, ambiguous) and retrieval strategy planning using `PlannerAgent`.
-  - Sequential agent state graph orchestration using LangGraph: `START -> Planner -> Retrieval -> Reranking -> Context Builder -> Generator -> END`.
-  - Grounded answer generation utilizing the existing `RAGGenerator` without query logic duplication.
-  - Interactive multi-agent pipeline execution timeline rendered directly in the Streamlit diagnostics interface.
-  - Fully sandboxed testing setup with lazy-initialized retrieval singletons and configuration dependency injection.
-  - 76 automated unit, integration, and E2E tests passing with 100% success rate.
+  - Automated atomic claim extraction and fact verification against context excerpts with structured evaluation statuses.
+  - Multi-agent Critic loops assessing answer completeness, support, contradictions, and choosing ACCEPT/REPAIR/KILL pathways.
+  - Multi-turn repair node executing query rewrites, retrieval expansion (top-k), and retrieval strategy shifts.
+  - Deterministic loop protection limiting retries to `MAX_REPAIR_ATTEMPTS = 2` to prevent infinite LLM execution.
+  - Fail-safe Kill node refusing answer generation safely in insufficient-evidence scenarios to eliminate hallucination risk.
+  - Real-time Guardrails & Verification Streamlit telemetry panel exposing Critic PASS/FAIL, Evidence coverage %, System confidence estimate %, Repair attempts, and Final decisions.
+  - Interactive demonstration runner (`scripts/demo_failsafe_kill.py`) showcasing execution aborts on insufficient-evidence queries.
+  - Comprehensive unit test coverage covering loop successes, loop failures, empty searches, contradiction kills, and prompt injection data isolation (81 tests passing).
 
 ---
 

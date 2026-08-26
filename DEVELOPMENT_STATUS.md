@@ -1,6 +1,6 @@
 # SentinelRAG — Development Status
 
-## Current Status: Phase 5 (Complete)
+## Current Status: Phase 6 (Complete)
 
 **Last Updated:** August 2026
 **Target Architecture:** Local-First Self-Improving Multi-Agent RAG
@@ -16,8 +16,39 @@
 | **Phase 3** | Conventional RAG Baseline (Retrieval, Context, Generation & Query API) | **Completed ✅** |
 | **Phase 4** | Hybrid Retrieval, Reranking & Research Evaluation Baseline | **Completed ✅** |
 | **Phase 5** | Multi-Agent Reasoning Loops (Planner & Generator orchestration via LangGraph) | **Completed ✅** |
-| **Phase 6** | Multi-Agent Refinement (Critic, Claim Extractor, Evidence Verifier, Repair) | **Next Up ⏳** |
-| **Phase 7** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | Planned ⏳ |
+| **Phase 6** | Multi-Agent Refinement (Critic, Claim Extractor, Evidence Verifier, Repair, Kill) | **Completed ✅** |
+| **Phase 7** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | **Next Up ⏳** |
+
+---
+
+## ✅ Completed in Phase 6
+
+1. **Claim Extraction Agent (`app/agents/claim_extractor.py`):**
+   - Deconstructs draft answers into atomic, independently verifiable propositions.
+   - Built offline-safe sentence-level parsing heuristics fallbacks for testing.
+
+2. **Evidence Verifier Agent (`app/agents/verifier.py`):**
+   - Evaluates each proposition against source context chunks.
+   - Assigns verification status values: `SUPPORTED`, `PARTIALLY_SUPPORTED`, `UNSUPPORTED`, `CONTRADICTED`, `UNCERTAIN`.
+
+3. **Critic Agent (`app/agents/critic.py`):**
+   - Audits verifications for completeness, support, and contradictions.
+   - Selects orchestration pathways: `ACCEPT`, `REPAIR`, or `KILL` and recommends repair strategies.
+
+4. **Multi-Agent Orchestrator Loop (`app/agents/graph.py`):**
+   - Connected verifier and repair loops back to retrieval using LangGraph.
+   - Enforced a strict retry limit (`MAX_REPAIR_ATTEMPTS = 2`) to prevent infinite RAG loops.
+   - Implemented a Judge node scoring confidence and enforcing safety overrides.
+   - Implemented a Kill node refusing response generation safely to eliminate hallucinations.
+
+5. **Playground Verification Telemetry UI (`frontend/main.py`):**
+   - Rendered verification dashboard displays in Streamlit: Critic PASS/FAIL, Evidence coverage %, System confidence %, Repair attempts count, and Final decision.
+
+6. **Demonstration Script (`scripts/demo_failsafe_kill.py`):**
+   - Built a mock execution script running the full graph over a query with insufficient evidence, demonstrating the planning, retrieval, critic reject, repair loop, and Judge override failsafe kill refusal block.
+
+7. **Expanded Unit & Integration Tests (`tests/unit/test_agent_repair.py`):**
+   - Added unit test cases covering repair successes, repair failures, hard retry bounds, contradiction kills, empty search refusals, and prompt injection data isolation.
 
 ---
 

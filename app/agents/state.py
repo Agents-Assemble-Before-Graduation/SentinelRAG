@@ -9,7 +9,9 @@ class AgentState(TypedDict):
 
     # Inputs and Configuration
     question: str
+    original_question: str           # Storing original query before rewrites
     workspace_id: str | None
+    top_k_override: int | None       # Retrieval expansion override
 
     # Step 1: Planning (Planner outputs)
     query_type: str                  # 'factual', 'definition', 'comparison', 'multi-hop', 'summarization', 'numerical', 'ambiguous'
@@ -29,15 +31,17 @@ class AgentState(TypedDict):
     final_answer: str                # Final accepted response
     sources: List[Dict[str, Any]]    # Structured source citations
 
-    # Future multi-agent verification fields (placeholders/stubs for Phase 6)
-    claims: List[str]
-    critique: str
-    verification: Dict[str, Any]
-    repair_strategy: str
-    retry_count: int
+    # Step 5: Verification & Critique (Phase 6)
+    claims: List[Dict[str, Any]]     # Atomic claims list: [{"id": "...", "text": "..."}]
+    verification: List[Dict[str, Any]] # Claim verifications: [{"id": "...", "status": "...", "reason": "...", "citations": [...]}]
+    critique: str                    # Detailed feedback string
+    critic_score: float              # Scored factual confidence
+    issues: List[str]                # List of specific critique issues
+    repair_strategy: str              # Recommended repair action: QUERY_REWRITE, etc.
+    retry_count: int                 # Loop retry attempts tracking
 
     # Metadata, Telemetry & Decisions
-    final_decision: str              # 'accept', 'refuse'
-    confidence: float                # Confidence score (0.0 to 1.0)
+    final_decision: str              # 'accept', 'repair', 'kill'
+    confidence: float                # Final system estimated confidence score (0.0 to 1.0)
     cost: float                      # Token / API cost tracking
     latency: Dict[str, float]        # Timestamp latency tracking per node

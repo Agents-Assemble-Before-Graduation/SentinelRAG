@@ -243,7 +243,7 @@ async def test_full_graph_invocation():
 
     mock_generator = AsyncMock()
     mock_generator.generate.return_value = GenerationResult(
-        answer="Grounded Agent Answer",
+        answer="SentinelRAG is a self-improving platform",
         sources=[],
         model_used="test-model",
         grounded=True,
@@ -262,5 +262,5 @@ async def test_full_graph_invocation():
     assert final_state["query_type"] == "definition"
     assert final_state["retrieval_strategy"] == "dense"
     assert final_state["context"] != ""
-    assert final_state["final_answer"] == "Grounded Agent Answer"
-    assert final_state["final_decision"] == "accept"
+    assert final_state["final_answer"] == "SentinelRAG is a self-improving platform"
+    assert final_state["final_decision"] == "ACCEPT"

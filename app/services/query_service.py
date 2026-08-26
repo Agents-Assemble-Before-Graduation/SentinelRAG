@@ -145,7 +145,9 @@ class RAGQueryService:
         # Initialize LangGraph state
         initial_state = {
             "question": question,
+            "original_question": question,
             "workspace_id": workspace_id,
+            "top_k_override": None,
             "query_type": "",
             "plan": "",
             "subquestions": [],
@@ -157,8 +159,10 @@ class RAGQueryService:
             "final_answer": "",
             "sources": [],
             "claims": [],
+            "verification": [],
             "critique": "",
-            "verification": {},
+            "critic_score": 0.0,
+            "issues": [],
             "repair_strategy": "",
             "retry_count": 0,
             "final_decision": "",
@@ -237,7 +241,7 @@ class RAGQueryService:
             model_used=self._generator._llm.model_name,
             chunks_retrieved=len(final_state.get("retrieved_documents") or []),
             context_chars=len(final_state.get("context", "")),
-            grounded=final_state.get("final_decision") == "accept",
+            grounded=str(final_state.get("final_decision")).lower() == "accept",
             tokens_used=0,
             metadata={
                 "context_truncated": False,
@@ -248,6 +252,14 @@ class RAGQueryService:
                 "reranked": reranked,
                 "plan": final_state.get("plan", ""),
                 "latency_breakdown": latencies,
+                # Phase 6 additions
+                "final_decision": final_state.get("final_decision", "accept"),
+                "critic_score": final_state.get("critic_score", 1.0),
+                "confidence": final_state.get("confidence", 1.0),
+                "retry_count": final_state.get("retry_count", 0),
+                "issues": final_state.get("issues") or [],
+                "claims": final_state.get("claims") or [],
+                "verification": final_state.get("verification") or [],
             },
         )
 

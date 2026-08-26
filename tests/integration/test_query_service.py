@@ -38,7 +38,7 @@ async def test_query_service_full_pipeline():
     service = RAGQueryService(
         embedding_provider=DeterministicEmbeddingProvider(dimension=384),
         vector_store=mock_vector_store,
-        llm_provider=MockLLMProvider(response_text="Answer: RAG stands for retrieval augmented generation."),
+        llm_provider=MockLLMProvider(response_text="RAG is retrieval augmented generation."),
         collection_name="test_collection",
         top_k=5,
         score_threshold=0.2
@@ -55,7 +55,7 @@ async def test_query_service_full_pipeline():
 
     # Telemetry and result verification
     assert isinstance(result, QueryResult)
-    assert result.answer == "Answer: RAG stands for retrieval augmented generation."
+    assert result.answer == "RAG is retrieval augmented generation."
     assert len(result.sources) == 1
     assert result.sources[0].document_title == "RAG Spec"
     assert result.sources[0].score == 0.88
@@ -77,6 +77,6 @@ async def test_query_service_full_pipeline():
     added_obj = mock_db.add.call_args[0][0]
     assert isinstance(added_obj, QueryLog)
     assert added_obj.query_text == "What is RAG?"
-    assert added_obj.answer_text == "Answer: RAG stands for retrieval augmented generation."
+    assert added_obj.answer_text == "RAG is retrieval augmented generation."
     assert added_obj.workspace_id == uuid.UUID(workspace_id)
     assert mock_db.commit.called
