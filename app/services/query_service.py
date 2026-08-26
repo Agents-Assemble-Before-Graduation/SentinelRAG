@@ -18,6 +18,9 @@ from app.rag.embeddings.factory import get_embedding_provider
 from app.rag.generation.generator import GenerationResult, RAGGenerator
 from app.rag.retrieval import DenseRetriever, BM25Retriever, HybridRetriever, RetrievedChunk, get_reranker
 from app.services.vector_store import QdrantVectorStore, get_vector_store
+from app.memory.episode_store import EpisodeStore
+from app.memory.lesson_store import LessonStore
+from app.memory.lesson_extractor import LessonExtractor
 
 logger = get_logger(__name__)
 
@@ -169,6 +172,9 @@ class RAGQueryService:
             "confidence": 0.0,
             "cost": 0.0,
             "latency": {},
+            # Phase 7: experience memory fields (populated by planner_node)
+            "relevant_lessons": [],
+            "lessons_used_count": 0,
         }
 
         # Run compiled LangGraph state graph
@@ -201,6 +207,15 @@ class RAGQueryService:
                 answer=final_state.get("final_answer", ""),
                 latency_ms=total_latency_ms,
             )
+
+        # ── Step 4b: Phase 7 — Experience Memory lifecycle ────────────────────
+        await self._persist_episode_and_extract_lessons(
+            db=db,
+            workspace_id=workspace_id,
+            question=question,
+            final_state=final_state,
+            total_latency_ms=total_latency_ms,
+        )
 
         # ── Step 5: Build response ────────────────────────────────────────────
         sources_dict = final_state.get("sources") or []
@@ -260,6 +275,8 @@ class RAGQueryService:
                 "issues": final_state.get("issues") or [],
                 "claims": final_state.get("claims") or [],
                 "verification": final_state.get("verification") or [],
+                # Phase 7 additions
+                "lessons_used_count": final_state.get("lessons_used_count", 0),
             },
         )
 
@@ -293,3 +310,85 @@ class RAGQueryService:
                 await db.rollback()
             except Exception:
                 pass
+
+    async def _persist_episode_and_extract_lessons(
+        self,
+        db: "AsyncSession | None",
+        workspace_id: str | None,
+        question: str,
+        final_state: dict,
+        total_latency_ms: float,
+    ) -> None:
+        """Persist a complete query episode and extract lessons for notable runs.
+
+        This method implements the Phase 7 experience memory write path:
+        1. Always persist an EpisodeRecord (silently skipped if db is None).
+        2. If the episode is notable (killed, repaired, or low-confidence),
+           run LessonExtractor and store deduplicated lessons via LessonStore.
+
+        Never raises — all errors are caught and logged.
+        """
+        try:
+            # Calculate evidence coverage from verification results
+            verifications = final_state.get("verification") or []
+            total_claims = len(verifications)
+            supported = sum(1 for v in verifications if v.get("status") == "SUPPORTED")
+            partial = sum(1 for v in verifications if v.get("status") == "PARTIALLY_SUPPORTED")
+            coverage = (supported + 0.5 * partial) / total_claims if total_claims > 0 else 1.0
+
+            final_decision = str(final_state.get("final_decision", "accept")).lower()
+            repair_attempts = final_state.get("retry_count", 0)
+            was_killed = final_decision == "kill"
+
+            # 1. Persist episode
+            episode_store = EpisodeStore()
+            episode = await episode_store.store(
+                db,
+                question=question,
+                query_type=final_state.get("query_type"),
+                retrieval_strategy=final_state.get("retrieval_strategy"),
+                plan=final_state.get("plan"),
+                final_answer=final_state.get("final_answer"),
+                final_decision=final_decision,
+                critic_score=final_state.get("critic_score"),
+                confidence=final_state.get("confidence"),
+                evidence_coverage=round(coverage, 4),
+                repair_attempts=repair_attempts,
+                was_killed=was_killed,
+                latency_ms=round(total_latency_ms, 2),
+                cost=final_state.get("cost"),
+                issues=final_state.get("issues") or [],
+                workspace_id=workspace_id,
+            )
+
+            # 2. Extract and store lessons for notable episodes only
+            episode_data = {
+                "query_type": final_state.get("query_type", "factual"),
+                "retrieval_strategy": final_state.get("retrieval_strategy", "dense"),
+                "confidence": final_state.get("confidence", 1.0),
+                "repair_attempts": repair_attempts,
+                "was_killed": was_killed,
+                "issues": final_state.get("issues") or [],
+            }
+
+            extractor = LessonExtractor()
+            lessons = await extractor.extract(episode_data)
+
+            if lessons:
+                lesson_store = LessonStore()
+                source_id = episode.id if episode else None
+                for lesson_data in lessons:
+                    await lesson_store.store_lesson(
+                        db,
+                        lesson=lesson_data["lesson"],
+                        category=lesson_data["category"],
+                        confidence=lesson_data["confidence"],
+                        source_episode_id=source_id,
+                    )
+                logger.info(
+                    "[MemoryLifecycle] Extracted and stored %d lessons from episode", len(lessons)
+                )
+
+        except Exception as exc:
+            logger.warning("[MemoryLifecycle] Episode/lesson persistence failed: %s", str(exc))
+

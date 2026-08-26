@@ -19,6 +19,9 @@ from app.rag.retrieval.bm25 import BM25Retriever
 from app.rag.retrieval.hybrid import HybridRetriever
 from app.rag.retrieval.reranker import get_reranker
 from app.rag.context.builder import ContextBuilder
+from app.memory.lesson_store import LessonStore
+from app.memory.episode_store import EpisodeStore
+from app.memory.lesson_extractor import LessonExtractor
 
 logger = get_logger(__name__)
 
@@ -60,13 +63,22 @@ def get_default_context_builder():
 # ── Graph Nodes ─────────────────────────────────────────────────────────────
 
 async def planner_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
-    """Planner node: Classifies query and maps retrieval steps."""
+    """Planner node: Retrieves relevant lessons from memory, then classifies query and maps retrieval steps."""
     start_time = time.perf_counter()
     question = state["question"]
+    db = config.get("configurable", {}).get("db")
 
     logger.info("[Agent Node: Planner] Analyzing query '%s'", question[:50])
+
+    # --- Phase 7: Retrieve relevant lessons from experience memory ---
+    lesson_store = LessonStore()
+    relevant_lessons = await lesson_store.retrieve_relevant(db, query=question)
+    lessons_used_count = len(relevant_lessons)
+    if lessons_used_count:
+        logger.info("[Agent Node: Planner] Injecting %d lessons from experience memory", lessons_used_count)
+
     planner = PlannerAgent()
-    plan_data = await planner.plan(question)
+    plan_data = await planner.plan(question, lessons=relevant_lessons if relevant_lessons else None)
 
     latency_ms = (time.perf_counter() - start_time) * 1000.0
     current_latency = state.get("latency") or {}
@@ -78,6 +90,8 @@ async def planner_node(state: AgentState, config: RunnableConfig) -> Dict[str, A
         "plan": plan_data["plan"],
         "subquestions": plan_data["subquestions"],
         "original_question": question,  # Keep backup of original question
+        "relevant_lessons": relevant_lessons,
+        "lessons_used_count": lessons_used_count,
         "latency": current_latency,
         "retry_count": 0,
     }

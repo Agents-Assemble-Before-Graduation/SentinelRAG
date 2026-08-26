@@ -40,6 +40,10 @@ class AgentState(TypedDict):
     repair_strategy: str              # Recommended repair action: QUERY_REWRITE, etc.
     retry_count: int                 # Loop retry attempts tracking
 
+    # Step 0: Experience Memory (Phase 7)
+    relevant_lessons: List[Dict[str, Any]]  # Lessons retrieved before planning
+    lessons_used_count: int                  # Number of lessons injected into Planner
+
     # Metadata, Telemetry & Decisions
     final_decision: str              # 'accept', 'repair', 'kill'
     confidence: float                # Final system estimated confidence score (0.0 to 1.0)

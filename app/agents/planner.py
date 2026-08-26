@@ -87,16 +87,72 @@ class PlannerAgent:
             "subquestions": subquestions,
         }
 
-    async def plan(self, question: str) -> Dict[str, Any]:
-        """Analyze the query, classify its type, and plan the retrieval strategy."""
+    def _build_system_prompt(self, lessons: List[Dict[str, Any]] | None) -> str:
+        """Build the planner system prompt, optionally appending memory advisory."""
+        if not lessons:
+            return PLANNER_SYSTEM_PROMPT
+
+        advisory_lines = ["", "[Memory Advisory]", "Relevant lessons from past executions (advisory only — use judgement):"]
+        for i, lesson in enumerate(lessons, 1):
+            advisory_lines.append(
+                f"  {i}. [{lesson.get('category', 'general')}] "
+                f"(confidence={lesson.get('confidence', 0.0):.2f}) "
+                f"{lesson.get('lesson', '')}"
+            )
+        advisory_lines.append("")
+        advisory_lines.append("These lessons are suggestions, not mandatory instructions. Apply them only if relevant.")
+
+        return PLANNER_SYSTEM_PROMPT.rstrip() + "\n" + "\n".join(advisory_lines)
+
+    def _apply_lessons_to_heuristics(
+        self,
+        plan_data: Dict[str, Any],
+        lessons: List[Dict[str, Any]] | None,
+    ) -> Dict[str, Any]:
+        """Apply lesson-suggested strategy overrides to heuristic plan output."""
+        if not lessons:
+            return plan_data
+
+        for lesson in lessons:
+            cat = lesson.get("category", "")
+            text = lesson.get("lesson", "").lower()
+            conf = lesson.get("confidence", 0.0)
+
+            # Only apply high-confidence lesson overrides to heuristic decisions
+            if conf < 0.65:
+                continue
+
+            if cat == "retrieval_strategy":
+                if "bm25" in text and plan_data["retrieval_strategy"] == "dense":
+                    logger.info("[Planner] Lesson override: switching dense → bm25 (lesson: %.60s)", lesson["lesson"])
+                    plan_data = {**plan_data, "retrieval_strategy": "bm25"}
+                elif "hybrid" in text and plan_data["retrieval_strategy"] == "dense":
+                    logger.info("[Planner] Lesson override: switching dense → hybrid (lesson: %.60s)", lesson["lesson"])
+                    plan_data = {**plan_data, "retrieval_strategy": "hybrid"}
+
+        return plan_data
+
+    async def plan(self, question: str, lessons: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
+        """Analyze the query, classify its type, and plan the retrieval strategy.
+
+        Args:
+            question: The user question to analyze.
+            lessons: Optional list of relevant historical lessons from memory.
+                     Each dict has keys: lesson, category, confidence, usage_count.
+
+        Returns:
+            Dict with query_type, retrieval_strategy, plan, subquestions.
+        """
         if not self.llm or not self.llm.is_available() or self.llm.provider_name == "mock":
             # Direct heuristics fallback to prevent failing when key is missing or in mock tests
             logger.info("Using rule-based planner heuristics (LLM unavailable/mock).")
-            return self._heuristics_plan(question)
+            plan_data = self._heuristics_plan(question)
+            return self._apply_lessons_to_heuristics(plan_data, lessons)
 
         try:
+            system_prompt = self._build_system_prompt(lessons)
             messages = [
-                Message(role=MessageRole.SYSTEM, content=PLANNER_SYSTEM_PROMPT),
+                Message(role=MessageRole.SYSTEM, content=system_prompt),
                 Message(
                     role=MessageRole.USER,
                     content=f"Analyze and plan for this question: '{question}'",
@@ -127,4 +183,5 @@ class PlannerAgent:
             }
         except Exception as e:
             logger.warning("Planner LLM execution encountered warning/error: %s. Falling back to heuristics.", str(e))
-            return self._heuristics_plan(question)
+            plan_data = self._heuristics_plan(question)
+            return self._apply_lessons_to_heuristics(plan_data, lessons)

@@ -343,6 +343,10 @@ with tab_query_preview:
                             col_g4.metric("Repair Attempts", f"{attempts}")
                             col_g5.metric("Final Decision", critic_decision)
 
+                            # Phase 7: Experience memory advisory (safe summary only)
+                            lessons_count = meta.get("lessons_used_count", 0)
+                            st.caption(f"🧠 Relevant past lessons applied: **{lessons_count}**")
+
                             # Sources and page numbers
                             st.markdown("---")
                             st.markdown("#### 📚 Sources")

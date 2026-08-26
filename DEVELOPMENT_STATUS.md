@@ -1,6 +1,6 @@
 # SentinelRAG — Development Status
 
-## Current Status: Phase 6 (Complete)
+## Current Status: Phase 7 (Complete)
 
 **Last Updated:** August 2026
 **Target Architecture:** Local-First Self-Improving Multi-Agent RAG
@@ -17,7 +17,56 @@
 | **Phase 4** | Hybrid Retrieval, Reranking & Research Evaluation Baseline | **Completed ✅** |
 | **Phase 5** | Multi-Agent Reasoning Loops (Planner & Generator orchestration via LangGraph) | **Completed ✅** |
 | **Phase 6** | Multi-Agent Refinement (Critic, Claim Extractor, Evidence Verifier, Repair, Kill) | **Completed ✅** |
-| **Phase 7** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | **Next Up ⏳** |
+| **Phase 7** | Experience Memory, Self-Improvement Loop & Continuous Evaluation | **Completed ✅** |
+
+---
+
+## ✅ Completed in Phase 7
+
+1. **Episodic Memory (`app/memory/episode_store.py`):**
+   - Persists each query execution trace to PostgreSQL: question, plan, strategy, verification outcome, confidence, latency, cost, and repair attempts.
+   - Gracefully no-ops when no database session is available (test/offline-safe).
+
+2. **Lesson Extractor (`app/memory/lesson_extractor.py`):**
+   - Identifies "notable" episodes (killed, repaired, or low-confidence < 0.6).
+   - Derives generalised retrieval strategy lessons using the LLM when available, with deterministic rule-based fallbacks for offline/test mode.
+   - Produces structured lessons with category and confidence scores.
+
+3. **Lesson Store (`app/memory/lesson_store.py`):**
+   - Persists structured lessons to PostgreSQL with SHA-256 deduplication hash.
+   - Enforces minimum confidence threshold (≥ 0.5) before storing.
+   - Relevance retrieval via keyword overlap and category matching against query tokens.
+   - Increments usage count for retrieved lessons.
+
+4. **Planner Lesson Integration (`app/agents/planner.py`):**
+   - Extended `PlannerAgent.plan()` to accept relevant lessons as advisory context.
+   - Injects lessons into the system prompt as a clearly-labelled `[Memory Advisory]` block.
+   - High-confidence lesson overrides (≥ 0.65) shift retrieval strategy in heuristic mode.
+
+5. **Graph Integration (`app/agents/graph.py`):**
+   - Planner node retrieves relevant lessons from `LessonStore` before calling the Planner.
+   - Lessons-used count flows through `AgentState` and is surfaced in response metadata.
+
+6. **Post-Run Memory Lifecycle (`app/services/query_service.py`):**
+   - After every graph completion, persists an `EpisodeRecord`.
+   - For notable episodes, runs `LessonExtractor` and stores deduplicated lessons.
+   - All steps wrapped in try/except — memory failures never affect user responses.
+
+7. **Evaluation Script (`scripts/evaluate_memory.py`):**
+   - Runs the Planner on a 5-query benchmark without and with pre-seeded lessons.
+   - Measures retrieval strategy distribution shift as concrete evidence of orchestration improvement.
+   - Outputs markdown table to `evaluation_results/memory_comparison.md`.
+   - **Observed**: With lessons, BM25 usage increased from 2→4 for numerical/factual queries (dense→bm25 upgrades).
+
+8. **UI (`frontend/main.py`):**
+   - Added `🧠 Relevant past lessons applied: N` caption to the Guardrails telemetry panel.
+
+9. **Tests (`tests/unit/test_memory.py`):** 27 new tests covering:
+   - Episode storage, graceful db-None handling, killed episode fields.
+   - Lesson deduplication, confidence threshold gating, usage count increment.
+   - Lesson extractor notability checks, rule-based lesson generation, lesson key validation.
+   - Planner + lesson integration: override behaviour, threshold gating, prompt construction.
+   - Lesson hash stability and whitespace normalisation.
 
 ---
 

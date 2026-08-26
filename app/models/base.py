@@ -100,6 +100,64 @@ class AgentRunRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="agent_runs")
 
 
+class EpisodeRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Complete query execution episode stored for experience memory.
+
+    Captures the full trace of one agent run — from question to final decision —
+    enabling lesson extraction and orchestration self-improvement over time.
+    """
+
+    __tablename__ = "episodes"
+
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    query_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    retrieval_strategy: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    plan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_decision: Mapped[str] = mapped_column(String(32), default="accept", nullable=False)  # accept / kill
+    critic_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evidence_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    repair_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    was_killed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    issues_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # Lessons derived from this episode
+    lessons: Mapped[list["LessonRecord"]] = relationship(
+        "LessonRecord", back_populates="source_episode", cascade="all, delete-orphan"
+    )
+
+
+class LessonRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A generalised, deduplicated lesson extracted from notable query episodes.
+
+    Lessons encode retrieval strategy patterns learnt from failures and successes.
+    They are injected into the Planner as advisory context before future runs.
+    """
+
+    __tablename__ = "lessons"
+
+    source_episode_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lesson: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    # e.g. "retrieval_strategy", "query_rewriting", "evidence_gap", "contradiction"
+    confidence: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)
+    lesson_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Relationship back to source episode
+    source_episode: Mapped["EpisodeRecord | None"] = relationship(
+        "EpisodeRecord", back_populates="lessons"
+    )
+
+
 class QueryLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Telemetry log for incoming queries and decision auditing."""
 

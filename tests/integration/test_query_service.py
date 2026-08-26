@@ -72,11 +72,17 @@ async def test_query_service_full_pipeline():
         filter_conditions={"workspace_id": workspace_id}
     )
 
-    # Verify database query log was persisted
+    # Verify database query log was persisted.
+    # Phase 7 adds an EpisodeRecord add() before the QueryLog add(), so we
+    # search all add() calls to find the QueryLog entry.
     assert mock_db.add.called
-    added_obj = mock_db.add.call_args[0][0]
-    assert isinstance(added_obj, QueryLog)
-    assert added_obj.query_text == "What is RAG?"
-    assert added_obj.answer_text == "RAG is retrieval augmented generation."
-    assert added_obj.workspace_id == uuid.UUID(workspace_id)
+    from app.models.base import QueryLog, EpisodeRecord
+    added_objs = [call.args[0] for call in mock_db.add.call_args_list]
+    query_log_objs = [obj for obj in added_objs if isinstance(obj, QueryLog)]
+    assert len(query_log_objs) == 1, f"Expected 1 QueryLog add(), found: {[type(o).__name__ for o in added_objs]}"
+    query_log = query_log_objs[0]
+    assert query_log.query_text == "What is RAG?"
+    assert query_log.answer_text == "RAG is retrieval augmented generation."
+    assert query_log.workspace_id == uuid.UUID(workspace_id)
     assert mock_db.commit.called
+
