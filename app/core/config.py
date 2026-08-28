@@ -105,6 +105,32 @@ class Settings(BaseSettings):
         default=12000, description="Maximum characters in assembled RAG context"
     )
 
+    # ── Phase 8: Security & Cost Limits ───────────────────────────────────────
+    MAX_LLM_CALLS: int = Field(
+        default=10,
+        description="Hard cap on total LLM calls per query (across all agents)",
+    )
+    MAX_CONTEXT_TOKENS: int = Field(
+        default=8192,
+        description="Maximum token budget for context window",
+    )
+    MAX_QUERY_LENGTH: int = Field(
+        default=2000,
+        description="Maximum allowed question length in characters",
+    )
+    REQUEST_TIMEOUT: float = Field(
+        default=30.0,
+        description="Per-request timeout in seconds for the full RAG pipeline",
+    )
+    MAX_REPAIR_ATTEMPTS: int = Field(
+        default=2,
+        description="Hard cap on repair loop iterations (overrides hardcoded value)",
+    )
+    MAX_COST_USD_PER_QUERY: float = Field(
+        default=0.10,
+        description="Maximum estimated USD cost allowed per single query",
+    )
+
     @field_validator("LOG_LEVEL")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

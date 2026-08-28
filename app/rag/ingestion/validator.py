@@ -91,3 +91,43 @@ def validate_document_file(
         raise ValidationError("Invalid DOCX format: file does not match Office Open XML structure.")
 
     return clean_name, source_type
+
+
+def validate_no_executable_content(content: bytes, filename: str) -> None:
+    """Reject content that appears to be an executable script.
+
+    Checks for Unix/Windows shebang lines and known script signatures.
+    This is a defense-in-depth measure in addition to extension and magic-byte checks.
+
+    Args:
+        content: Raw file bytes.
+        filename: Sanitized filename for error messages.
+
+    Raises:
+        ValidationError: If executable or script content is detected.
+    """
+    # Unix/Linux/macOS shebang
+    if content.startswith(b"#!"):
+        raise ValidationError(
+            f"Rejected '{filename}': file appears to be an executable script (shebang detected). "
+            "Executable content is not permitted."
+        )
+
+    # Windows batch / PowerShell indicators
+    content_start = content[:512].lower()
+    disallowed_starts = (
+        b"@echo off",
+        b"set-executionpolicy",
+        b"powershell",
+        b"<script",
+        b"<?php",
+        b"import os;",
+        b"import subprocess",
+    )
+    for sig in disallowed_starts:
+        if sig in content_start:
+            raise ValidationError(
+                f"Rejected '{filename}': file contains executable or script content "
+                f"({sig.decode(errors='replace')!r}). Executable content is not permitted."
+            )
+

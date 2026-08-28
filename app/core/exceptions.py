@@ -40,3 +40,21 @@ class ValidationError(SentinelRAGException):
 class LLMProviderError(SentinelRAGException):
     """Raised when an LLM provider fails, is misconfigured, or is unavailable."""
     pass
+
+
+class SecurityViolationError(SentinelRAGException):
+    """Raised when a security policy is violated.
+
+    Examples: prompt injection detected in document content, path traversal
+    attempt, disallowed file type or executable content.
+    """
+    pass
+
+
+class CostLimitError(SentinelRAGException):
+    """Raised when a per-query cost or LLM call budget is exceeded.
+
+    Prevents unbounded spending on repair loops or excessively large queries.
+    """
+    pass
+

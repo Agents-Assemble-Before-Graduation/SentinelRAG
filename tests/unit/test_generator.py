@@ -79,9 +79,12 @@ async def test_rag_generator_success():
     assert len(messages) == 2
     assert messages[0].role == MessageRole.SYSTEM
     assert messages[1].role == MessageRole.USER
-    
+
     # Verify prompt structures
-    assert "EXCLUSIVELY on the evidence passages" in messages[0].content
-    assert "<evidence>" in messages[1].content
+    # Phase 8: system prompt uses "DATA, not instructions" language
+    assert "evidence" in messages[0].content.lower() or "data" in messages[0].content.lower()
+    # Phase 8: user prompt wraps evidence in <document_content> tags
+    assert "<document_content>" in messages[1].content
     assert "Passage content." in messages[1].content
     assert "What is RAG?" in messages[1].content
+

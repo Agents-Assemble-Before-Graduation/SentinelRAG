@@ -21,6 +21,8 @@ from app.services.vector_store import QdrantVectorStore, get_vector_store
 from app.memory.episode_store import EpisodeStore
 from app.memory.lesson_store import LessonStore
 from app.memory.lesson_extractor import LessonExtractor
+from app.core.cost import CostTracker
+from app.core.telemetry import QueryTelemetry, emit_query_telemetry
 
 logger = get_logger(__name__)
 
@@ -217,6 +219,40 @@ class RAGQueryService:
             total_latency_ms=total_latency_ms,
         )
 
+        # ── Step 4c: Phase 8 — Cost tracking & structured observability ───────
+        settings = get_settings()
+        cost_tracker = CostTracker(
+            provider=settings.LLM_PROVIDER,
+            model=settings.LLM_MODEL,
+        )
+        # Token usage may come from the generator node via final_state
+        gen_tokens = final_state.get("tokens_used", 0) or 0
+        if gen_tokens:
+            cost_tracker.record_call("generator", prompt_tokens=gen_tokens)
+        cost_summary = cost_tracker.summary()
+
+        latencies_for_telem = final_state.get("latency") or {}
+        emit_query_telemetry(QueryTelemetry(
+            request_id=final_state.get("request_id", "unknown"),
+            question_length=len(question),
+            query_type=final_state.get("query_type", ""),
+            retrieval_strategy=final_state.get("retrieval_strategy", ""),
+            chunks_retrieved=len(final_state.get("retrieved_documents") or []),
+            context_chars=len(final_state.get("context", "")),
+            lessons_used=final_state.get("lessons_used_count", 0),
+            repair_count=final_state.get("retry_count", 0),
+            llm_calls=cost_summary["llm_call_count"],
+            final_decision=str(final_state.get("final_decision", "")),
+            confidence=final_state.get("confidence", 0.0),
+            grounded=str(final_state.get("final_decision", "")).lower() == "accept",
+            latency_breakdown=latencies_for_telem,
+            total_latency_ms=round(total_latency_ms, 2),
+            total_tokens=cost_summary["total_tokens"],
+            estimated_cost_usd=cost_summary["estimated_cost_usd"],
+            model_used=settings.LLM_MODEL,
+        ))
+
+
         # ── Step 5: Build response ────────────────────────────────────────────
         sources_dict = final_state.get("sources") or []
         sources = [
@@ -277,6 +313,8 @@ class RAGQueryService:
                 "verification": final_state.get("verification") or [],
                 # Phase 7 additions
                 "lessons_used_count": final_state.get("lessons_used_count", 0),
+                # Phase 8 additions
+                "cost": cost_summary,
             },
         )
 

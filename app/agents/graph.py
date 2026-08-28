@@ -301,10 +301,13 @@ async def judge_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
     if contradictions > 0:
         logger.warning("[Agent Node: Judge Override] Direct contradiction found in claims! Forcing KILL.")
         decision = "KILL"
-    
+
     # RULE B: If retry count exceeded -> Forcibly KILL rather than continuing repair
-    if retry_count >= 2 and decision == "REPAIR":
-        logger.warning("[Agent Node: Judge Override] Retry limit reached! Forcing KILL.")
+    _max_repairs = get_settings().MAX_REPAIR_ATTEMPTS
+    if retry_count >= _max_repairs and decision == "REPAIR":
+        logger.warning(
+            "[Agent Node: Judge Override] Retry limit (%d) reached! Forcing KILL.", _max_repairs
+        )
         decision = "KILL"
 
     latency_ms = (time.perf_counter() - start_time) * 1000.0

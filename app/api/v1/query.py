@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.exceptions import LLMProviderError, ValidationError
+from app.core.exceptions import LLMProviderError, ValidationError, CostLimitError, SecurityViolationError
 from app.core.logging import get_logger, request_id_ctx_var
 from app.database.session import get_db
 from app.services.query_service import QueryResult, RAGQueryService
@@ -132,6 +132,27 @@ async def query_documents(
                 "error": "LLMProviderError",
                 "message": exc.message,
                 "hint": "Ensure LLM_API_KEY is set in your .env file.",
+                "request_id": request_id,
+            },
+        ) from exc
+    except CostLimitError as exc:
+        logger.warning("Query rejected — cost limit exceeded: %s", exc.message)
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "CostLimitError",
+                "message": exc.message,
+                "hint": "Query exceeded the configured cost or token budget.",
+                "request_id": request_id,
+            },
+        ) from exc
+    except SecurityViolationError as exc:
+        logger.warning("Query rejected — security violation: %s", exc.message)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "SecurityViolationError",
+                "message": exc.message,
                 "request_id": request_id,
             },
         ) from exc

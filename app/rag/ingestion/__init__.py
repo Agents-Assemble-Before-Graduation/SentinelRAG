@@ -8,7 +8,7 @@ from app.rag.ingestion.extractors import (
     ExtractedSection,
     get_extractor_for_type,
 )
-from app.rag.ingestion.validator import sanitize_filename, validate_document_file
+from app.rag.ingestion.validator import sanitize_filename, validate_document_file, validate_no_executable_content
 
 __all__ = [
     "BaseExtractor",
@@ -20,4 +20,6 @@ __all__ = [
     "get_extractor_for_type",
     "sanitize_filename",
     "validate_document_file",
+    "validate_no_executable_content",
 ]
+
